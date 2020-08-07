@@ -72,5 +72,7 @@ public:
 
 	UFUNCTION()
 		void StopWalk();
+	UFUNCTION()
+		void StartSprint();
 };
 

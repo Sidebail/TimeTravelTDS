@@ -24,11 +24,12 @@ ATimeTravelTDSCharacter::ATimeTravelTDSCharacter()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// Configure character movement
+	/**	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Rotate character to moving direction
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 640.f, 0.f);
 	GetCharacterMovement()->bConstrainToPlane = true;
 	GetCharacterMovement()->bSnapToPlaneAtStart = true;
+	*/
 
 	// Create a camera boom...
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -104,8 +105,12 @@ void ATimeTravelTDSCharacter::SetupPlayerInputComponent(UInputComponent* NewInpu
 	Super::SetupPlayerInputComponent(InputComponent);
 	NewInputComponent->BindAxis(TEXT("MoveForward"), this, &ATimeTravelTDSCharacter::InputAxisX);
 	NewInputComponent->BindAxis(TEXT("MoveRight"), this, &ATimeTravelTDSCharacter::InputAxisY);
-	NewInputComponent->BindAction<>(TEXT("WalkButton"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartWalk);
-	NewInputComponent->BindAction<>(TEXT("WalkButton"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
+	NewInputComponent->BindAction(TEXT("WalkButton"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartWalk);
+	NewInputComponent->BindAction(TEXT("WalkButton"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
+	/*
+	NewInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartSprint);
+	NewInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
+	*/
 }
 
 void ATimeTravelTDSCharacter::InputAxisY(float Value)
@@ -130,6 +135,7 @@ void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 		FHitResult ResultHit;
 		myController->GetHitResultUnderCursorByChannel(ETraceTypeQuery::TraceTypeQuery3, false, ResultHit);
 		SetActorRotation(FQuat(FRotator(0.0f, UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw ,0.0f)));
+		
 	}
 }
 
@@ -172,3 +178,10 @@ void ATimeTravelTDSCharacter::StopWalk()
 {
 	ChangeMovementState(EMovementState::WALK_STATE);
 }
+
+void ATimeTravelTDSCharacter::StartSprint()
+{
+	ChangeMovementState(EMovementState::RUN_STATE);
+}
+
+

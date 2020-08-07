@@ -33,9 +33,10 @@ void ATimeTravelTDSPlayerController::SetupInputComponent()
 	// set up gameplay key bindings
 	Super::SetupInputComponent();
 
+	/*
 	InputComponent->BindAction("SetDestination", IE_Pressed, this, &ATimeTravelTDSPlayerController::OnSetDestinationPressed);
 	InputComponent->BindAction("SetDestination", IE_Released, this, &ATimeTravelTDSPlayerController::OnSetDestinationReleased);
-
+	*/
 	// support touch devices 
 	InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &ATimeTravelTDSPlayerController::MoveToTouchLocation);
 	InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &ATimeTravelTDSPlayerController::MoveToTouchLocation);
