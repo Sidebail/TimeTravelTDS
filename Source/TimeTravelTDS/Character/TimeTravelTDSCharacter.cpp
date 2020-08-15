@@ -133,7 +133,7 @@ void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 	if (myController)
 	{
 		FHitResult ResultHit;
-		myController->GetHitResultUnderCursorByChannel(ETraceTypeQuery::TraceTypeQuery3, false, ResultHit);
+		myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
 		SetActorRotation(FQuat(FRotator(0.0f, UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw ,0.0f)));
 		
 	}
