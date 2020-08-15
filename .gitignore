@@ -15,3 +15,6 @@ Saved
 .vs
 .plastic
 *.private.0
+.idea
+Build
+Content\beffio
