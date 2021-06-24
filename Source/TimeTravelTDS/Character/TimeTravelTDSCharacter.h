@@ -17,6 +17,7 @@ public:
 
 	// Called every frame.
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void BeginPlay() override;
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 
@@ -25,8 +26,7 @@ public:
 	FORCEINLINE class UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent; }
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	/** Returns CursorToWorld subobject **/
-	FORCEINLINE class UDecalComponent* GetCursorToWorld() { return CursorToWorld; }
+	
 
 
 private:
@@ -51,13 +51,39 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 		FCharacterSpeed MovementInfo;
 
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Equipment")
+		FName FirstWeaponName;
+	UPROPERTY(BlueprintReadOnly, Category="Equipment")
+		AWeaponDefault* CurrentWeapon;
+	
+
 	UFUNCTION()
 		void InputAxisY(float Value);
 	UFUNCTION()
 		void InputAxisX(float Value);
+	UFUNCTION()
+		void InputLookAxisX(float Value);
+	UFUNCTION()
+		void InputLookAxisY(float Value);
+
+	UFUNCTION(BlueprintCallable)
+		void InitWeapon(FName WeaponDataRowName);
+	
+	/** Returns CursorToWorld subobject **/
+	UFUNCTION(BlueprintCallable)
+		FVector GetCursorToWorld();
+	/** Does aiming logic */
+	UFUNCTION()
+		void TakeAim(bool bIsAiming);
 	
 	float AxisX = 0.0f;
 	float AxisY = 0.0f;
+
+	float LookAxisX = 0.0f;
+	float LookAxisY = 0.0f;
+
+	float bIsGamepadUsed = true;
 	
 	//Tick Func
 	void MovementTick(float DeltaTime);
@@ -67,12 +93,21 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void ChangeMovementState(EMovementState NewMovementState);
 
+	// Input Related Functions
 	UFUNCTION()
 		void StartWalk();
-
 	UFUNCTION()
 		void StopWalk();
 	UFUNCTION()
 		void StartSprint();
+	UFUNCTION()
+		void StartShooting();
+	UFUNCTION()
+		void EndShooting();
+	
+	UFUNCTION()
+		void SetMouseInput();
+	UFUNCTION()
+		void SetControllerInput();
 };
 

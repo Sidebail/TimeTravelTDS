@@ -13,6 +13,8 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "TimeTravelTDS/Game/TDSGameInstance.h"
+#include "TimeTravelTDS/Game/Weapons/WeaponDefault.h"
 
 ATimeTravelTDSCharacter::ATimeTravelTDSCharacter()
 {
@@ -66,38 +68,13 @@ ATimeTravelTDSCharacter::ATimeTravelTDSCharacter()
 void ATimeTravelTDSCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-
-	/* DEPRECATED
-
-	if (CursorToWorld != nullptr)
-	{
-		if (UHeadMountedDisplayFunctionLibrary::IsHeadMountedDisplayEnabled())
-		{
-			if (UWorld* World = GetWorld())
-			{
-				FHitResult HitResult;
-				FCollisionQueryParams Params(NAME_None, FCollisionQueryParams::GetUnknownStatId());
-				FVector StartLocation = TopDownCameraComponent->GetComponentLocation();
-				FVector EndLocation = TopDownCameraComponent->GetComponentRotation().Vector() * 2000.0f;
-				Params.AddIgnoredActor(this);
-				World->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, Params);
-				FQuat SurfaceRotation = HitResult.ImpactNormal.ToOrientationRotator().Quaternion();
-				CursorToWorld->SetWorldLocationAndRotation(HitResult.Location, SurfaceRotation);
-			}
-		}
-		else if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		{
-			FHitResult TraceHitResult;
-			PC->GetHitResultUnderCursor(ECC_Visibility, true, TraceHitResult);
-			FVector CursorFV = TraceHitResult.ImpactNormal;
-			FRotator CursorR = CursorFV.Rotation();
-			CursorToWorld->SetWorldLocation(TraceHitResult.Location);
-			CursorToWorld->SetWorldRotation(CursorR);
-		}
-	}
-
-	*/
 	MovementTick(DeltaSeconds);
+}
+
+void ATimeTravelTDSCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	InitWeapon(FirstWeaponName);
 }
 
 void ATimeTravelTDSCharacter::SetupPlayerInputComponent(UInputComponent* NewInputComponent)
@@ -107,6 +84,13 @@ void ATimeTravelTDSCharacter::SetupPlayerInputComponent(UInputComponent* NewInpu
 	NewInputComponent->BindAxis(TEXT("MoveRight"), this, &ATimeTravelTDSCharacter::InputAxisY);
 	NewInputComponent->BindAction(TEXT("WalkButton"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartWalk);
 	NewInputComponent->BindAction(TEXT("WalkButton"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
+	NewInputComponent->BindAction(TEXT("AnyClick"), IE_Pressed, this, &ATimeTravelTDSCharacter::SetMouseInput);
+	NewInputComponent->BindAction(TEXT("AnyGamepadButton"), IE_Pressed, this, &ATimeTravelTDSCharacter::SetControllerInput);
+	NewInputComponent->BindAxis(TEXT("LookXAxis"), this, &ATimeTravelTDSCharacter::InputLookAxisX);
+	NewInputComponent->BindAxis(TEXT("LookYAxis"), this, &ATimeTravelTDSCharacter::InputLookAxisY);
+
+	NewInputComponent->BindAction(TEXT("Fire"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartShooting);
+	NewInputComponent->BindAction(TEXT("Fire"), IE_Released, this, &ATimeTravelTDSCharacter::EndShooting);
 	/*
 	NewInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartSprint);
 	NewInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
@@ -124,6 +108,81 @@ void ATimeTravelTDSCharacter::InputAxisX(float Value)
 	AxisX = Value;
 }
 
+void ATimeTravelTDSCharacter::InputLookAxisX(float Value)
+{
+	LookAxisX = Value;
+}
+
+void ATimeTravelTDSCharacter::InputLookAxisY(float Value)
+{
+	LookAxisY = Value;
+}
+
+void ATimeTravelTDSCharacter::InitWeapon(FName WeaponDataRowName)
+{
+	UTDSGameInstance* myGI = Cast<UTDSGameInstance>(GetGameInstance());
+	FWeaponInfo newWeaponInfo;
+	if(myGI)
+	{
+		if(myGI->GetWeaponInfoByName(WeaponDataRowName, newWeaponInfo))
+		{
+			if(newWeaponInfo.WeaponClass)
+			{
+				FVector SpawnLocation = FVector(0);
+				FRotator SpawnRotation = FRotator(0);
+
+				FActorSpawnParameters SpawnParams;
+				SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				SpawnParams.Instigator = GetInstigator();
+				SpawnParams.Owner = GetOwner();
+
+				AWeaponDefault* newWeapon = Cast<AWeaponDefault>(GetWorld()->SpawnActor(newWeaponInfo.WeaponClass, &SpawnLocation, &SpawnRotation, SpawnParams));
+				if(newWeapon)
+				{
+					FAttachmentTransformRules Rule(EAttachmentRule::SnapToTarget, false);
+					newWeapon->AttachToComponent(GetMesh(), Rule, FName("WeaponRightHand"));
+					CurrentWeapon = newWeapon;
+
+					newWeapon->WeaponInit(newWeaponInfo);
+					newWeapon->UpdateStateWeapon(MovementState);
+				}
+			}
+		}else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("TimeTravelTDSCharacter::InitWeapon -- Weapon %s not found in weapon data table"));
+		}
+	}
+}
+
+FVector ATimeTravelTDSCharacter::GetCursorToWorld()
+{
+	APlayerController* myController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (myController)
+	{
+		if(bIsGamepadUsed)
+		{
+			return FVector(0,0,0);
+		}else
+		{
+			FHitResult ResultHit;
+			myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
+			return ResultHit.Location;
+		}
+	}else
+	{
+		return FVector(0,0,0);
+	}
+}
+
+void ATimeTravelTDSCharacter::TakeAim(bool bIsAiming)
+{
+	if(bIsAiming)
+	{
+		ChangeMovementState(EMovementState::AIM_STATE);
+		
+	}
+}
+
 void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 {
 	AddMovementInput(FVector(1.0f, 0.0f, 0.0f), AxisX);
@@ -132,9 +191,25 @@ void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 	APlayerController* myController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	if (myController)
 	{
-		FHitResult ResultHit;
-		myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
-		SetActorRotation(FQuat(FRotator(0.0f, UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw ,0.0f)));
+		
+		if(bIsGamepadUsed)
+		{
+			// This IF works like a dead zone for a stick, so character wont be turned to the right when player is not touching the right stick
+			if(UKismetMathLibrary::Abs(LookAxisX) > 1 || UKismetMathLibrary::Abs(LookAxisY) > 1)
+			{
+				FRotator newRotation = UKismetMathLibrary::MakeRotFromX(FVector(LookAxisX, LookAxisY, 0));
+				//Adjusting the direction
+				newRotation.Yaw+=90;
+				FRotator lerpedRotation = UKismetMathLibrary::RInterpTo(GetActorRotation(),newRotation,DeltaTime,10);
+				SetActorRotation(lerpedRotation);
+			}
+		}else
+		{
+			FHitResult ResultHit;
+			myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
+			SetActorRotation(FQuat(FRotator(0.0f, UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw ,0.0f)));
+		}
+		
 		
 	}
 }
@@ -182,6 +257,26 @@ void ATimeTravelTDSCharacter::StopWalk()
 void ATimeTravelTDSCharacter::StartSprint()
 {
 	ChangeMovementState(EMovementState::RUN_STATE);
+}
+
+void ATimeTravelTDSCharacter::StartShooting()
+{
+	CurrentWeapon->SetWeaponStateFire(true);
+}
+
+void ATimeTravelTDSCharacter::EndShooting()
+{
+	CurrentWeapon->SetWeaponStateFire(false);
+}
+
+void ATimeTravelTDSCharacter::SetMouseInput()
+{
+	bIsGamepadUsed = false;
+}
+
+void ATimeTravelTDSCharacter::SetControllerInput()
+{
+	bIsGamepadUsed = true;
 }
 
 
