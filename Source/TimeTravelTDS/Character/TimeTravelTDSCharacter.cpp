@@ -91,11 +91,14 @@ void ATimeTravelTDSCharacter::SetupPlayerInputComponent(UInputComponent* NewInpu
 
 	NewInputComponent->BindAction(TEXT("Fire"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartShooting);
 	NewInputComponent->BindAction(TEXT("Fire"), IE_Released, this, &ATimeTravelTDSCharacter::EndShooting);
+
+	NewInputComponent->BindAction(TEXT("ReloadEvent"), EInputEvent::IE_Pressed, this, &ATimeTravelTDSCharacter::OnReloadInput);
 	/*
 	NewInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ATimeTravelTDSCharacter::StartSprint);
 	NewInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ATimeTravelTDSCharacter::StopWalk);
 	*/
 }
+
 
 void ATimeTravelTDSCharacter::InputAxisY(float Value)
 {
@@ -145,6 +148,10 @@ void ATimeTravelTDSCharacter::InitWeapon(FName WeaponDataRowName)
 
 					newWeapon->WeaponInit(newWeaponInfo);
 					newWeapon->UpdateStateWeapon(MovementState);
+
+					// Subscribe reloading delegates to animation handling
+					newWeapon->OnWeaponReloadStart.AddDynamic(this, &ATimeTravelTDSCharacter::WeaponReloadStart);
+					newWeapon->OnWeaponReloadEnd.AddDynamic(this, &ATimeTravelTDSCharacter::WeaponReloadEnd);
 				}
 			}
 		}else
@@ -153,6 +160,25 @@ void ATimeTravelTDSCharacter::InitWeapon(FName WeaponDataRowName)
 		}
 	}
 }
+
+void ATimeTravelTDSCharacter::WeaponReloadStart(UAnimMontage* Anim)
+{
+	WeaponReloadStart_BP(Anim);
+}
+void ATimeTravelTDSCharacter::WeaponReloadEnd()
+{
+	WeaponReloadEnd_BP();
+}
+
+void ATimeTravelTDSCharacter::WeaponReloadStart_BP_Implementation(UAnimMontage* Anim)
+{
+	// in BP
+}
+void ATimeTravelTDSCharacter::WeaponReloadEnd_BP_Implementation()
+{
+	// in BP
+}
+
 
 FVector ATimeTravelTDSCharacter::GetCursorToWorld()
 {
@@ -183,6 +209,11 @@ void ATimeTravelTDSCharacter::TakeAim(bool bIsAiming)
 	}
 }
 
+/**
+ * @brief This function cares about the locomotion and rotation, regarding player input
+ * @param DeltaTime 
+ * 
+ */
 void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 {
 	AddMovementInput(FVector(1.0f, 0.0f, 0.0f), AxisX);
@@ -191,7 +222,7 @@ void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 	APlayerController* myController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	if (myController)
 	{
-		
+		FHitResult ResultHit;
 		if(bIsGamepadUsed)
 		{
 			// This IF works like a dead zone for a stick, so character wont be turned to the right when player is not touching the right stick
@@ -205,10 +236,40 @@ void ATimeTravelTDSCharacter::MovementTick(float DeltaTime)
 			}
 		}else
 		{
-			FHitResult ResultHit;
+			// If controller is not used - rotate character according to mouse 
 			myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
 			SetActorRotation(FQuat(FRotator(0.0f, UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw ,0.0f)));
 		}
+
+		// Update weapon's logic according to player's movement state
+		if(CurrentWeapon)
+			CurrentWeapon->UpdateStateWeapon(MovementState);
+
+		// After rotation let's fix the weapon firing direction
+		// Честно не вижу зачем это. Привязка к сокету уже дает необходимый подъём оружия...
+		// Мы же не будем создавать настолько мелкие цели в ТопДаунШутере, в которых пара пикселей по Z решит исход попадания...
+		// TODO: Figure this out or clean
+		/**
+		if(CurrentWeapon)
+		{
+			FVector Displacement = FVector(0);
+			switch (MovementState)
+			{
+				case EMovementState::AIM_STATE:
+					Displacement = FVector(0.0f, 0.0f, 160.0f);
+					break;
+				case EMovementState::WALK_STATE:
+					Displacement = FVector(0.0f, 0.0f, 120.0f);
+					break;
+				case EMovementState::RUN_STATE:
+					Displacement = FVector(0.0f, 0.0f, 120.0f);
+					break;
+				default:
+					break;
+			}
+			CurrentWeapon->loca = ResultHit.Location + Displacement;
+		}
+		*/
 		
 		
 	}
@@ -244,6 +305,21 @@ void ATimeTravelTDSCharacter::ChangeMovementState(EMovementState NewMovementStat
 	CharacterUpdate();
 }
 
+FSavedStats ATimeTravelTDSCharacter::GetDynamicStats()
+{
+	return DynamicSavedStats;
+}
+
+int32 ATimeTravelTDSCharacter::GetCurrentAmmo()
+{
+	return DynamicSavedStats.Round;
+}
+
+void ATimeTravelTDSCharacter::SetCurrentAmmo(int32 Ammo)
+{
+	DynamicSavedStats.Round = Ammo;
+}
+
 void ATimeTravelTDSCharacter::StartWalk()
 {
 	ChangeMovementState(EMovementState::SLOWED_STATE);
@@ -262,11 +338,28 @@ void ATimeTravelTDSCharacter::StartSprint()
 void ATimeTravelTDSCharacter::StartShooting()
 {
 	CurrentWeapon->SetWeaponStateFire(true);
+	APlayerController* myController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+
+	// Setting the last click location for weapon logic and further debug and logging.
+	if(bIsGamepadUsed)
+	{
+		FHitResult ResultHit;
+		myController->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), false, ResultHit);
+		LastClickLocation = ResultHit.Location;
+	}
+	
+			
 }
 
 void ATimeTravelTDSCharacter::EndShooting()
 {
 	CurrentWeapon->SetWeaponStateFire(false);
+}
+
+void ATimeTravelTDSCharacter::OnReloadInput()
+{
+	if(CurrentWeapon)
+		CurrentWeapon->InitReload();
 }
 
 void ATimeTravelTDSCharacter::SetMouseInput()

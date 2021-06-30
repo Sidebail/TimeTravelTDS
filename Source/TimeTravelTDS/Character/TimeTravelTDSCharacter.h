@@ -41,8 +41,8 @@ private:
 	/** A decal that projects to the cursor location. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UDecalComponent* CursorToWorld;
-
 	
+
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
@@ -56,7 +56,20 @@ public:
 		FName FirstWeaponName;
 	UPROPERTY(BlueprintReadOnly, Category="Equipment")
 		AWeaponDefault* CurrentWeapon;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Equipment")
+	FSavedStats DynamicSavedStats;
+
+	// Reload Animation handlers
+	UFUNCTION()
+		void WeaponReloadStart(UAnimMontage* Anim);
+	UFUNCTION()
+		void WeaponReloadEnd();
+	UFUNCTION(BlueprintNativeEvent)
+        void WeaponReloadStart_BP(UAnimMontage* Anim);
+	UFUNCTION(BlueprintNativeEvent)
+        void WeaponReloadEnd_BP();
+
 
 	UFUNCTION()
 		void InputAxisY(float Value);
@@ -93,6 +106,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void ChangeMovementState(EMovementState NewMovementState);
 
+	// Getters and setters
+	UFUNCTION(BlueprintCallable)
+	FSavedStats GetDynamicStats();
+
+	UFUNCTION(BlueprintCallable)
+	int32 GetCurrentAmmo();
+
+	UFUNCTION(BlueprintCallable)
+	void SetCurrentAmmo(int32 Ammo);
+
 	// Input Related Functions
 	UFUNCTION()
 		void StartWalk();
@@ -104,10 +127,16 @@ public:
 		void StartShooting();
 	UFUNCTION()
 		void EndShooting();
+	UFUNCTION(BlueprintCallable)
+		void OnReloadInput();
 	
 	UFUNCTION()
 		void SetMouseInput();
 	UFUNCTION()
 		void SetControllerInput();
+
+
+	// DEBUG AND TRASH
+	FVector LastClickLocation;
 };
 
