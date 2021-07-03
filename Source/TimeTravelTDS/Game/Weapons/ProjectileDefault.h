@@ -7,6 +7,7 @@
 #include "Components/SphereComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "PhysicsEngine/RadialForceComponent.h"
 
 #include "TimeTravelTDS/FuncLibrary/Types.h"
 #include "ProjectileDefault.generated.h"
@@ -28,6 +29,8 @@ public:
 		class UProjectileMovementComponent* BulletProjectileMovement = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category = Components)
 		class UParticleSystemComponent* BulletFX = nullptr;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess = "true"), Category=Components)
+		class URadialForceComponent* ForceComponent = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category="Data")
 		FProjectileInfo ProjectileData;

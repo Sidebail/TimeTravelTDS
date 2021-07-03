@@ -98,7 +98,6 @@ void AWeaponDefault::DispersionTick(float DeltaTime)
 {
 	if(DispersionTime <= 0)
 	{
-		
 		if(!WeaponFiring || WeaponReloading)
 		{
 			if(ShouldReduceDispersion)
@@ -115,7 +114,8 @@ void AWeaponDefault::DispersionTick(float DeltaTime)
 				CurrentDispersion = CurrentDispersionMax;
 		}
 	
-		DispersionTime = DispersionReductionStepTime;
+		DispersionTime = DispersionReductionStepTime + CurrentDispersionTimeout;
+		CurrentDispersionTimeout = 0;
 	}
 	else
 		DispersionTime-=DeltaTime;
@@ -228,7 +228,7 @@ void AWeaponDefault::Fire()
 			*  По сути надо постоянно брать точку куда указывает мышка, но у меня то идея брать не точку, а только направление,
 			*  т.к. хочу сделать проект под геймпад. Надо подумать.
 			*/
-			if (!GET_PLAYER_ZERO->bIsGamepadUsed && bIsControlledByPlayer)
+			if (!GET_PLAYER_ZERO->bIsGamepadUsed && bIsControlledByPlayer && WeaponData.bIsMouseFollowed)
 			{
 				FHitResult ResultHit;
 				UGameplayStatics::GetPlayerController(GetWorld(), 0)->GetHitResultUnderCursorByChannel(
@@ -269,7 +269,61 @@ void AWeaponDefault::Fire()
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("AWeaponDefault::Fire() -- Missing ProjectileActorClass reference"));
+				// If no projectile is setted, shoot a trace
+				FHitResult HitResult;
+				FVector StartLocation = ShootLocation->GetComponentLocation();
+				FVector EndLocation = ShootLocation->GetForwardVector() * WeaponData.TraceRange + StartLocation;
+				FCollisionQueryParams CollisionParams;
+				CollisionParams.bTraceComplex = true;
+				CollisionParams.bReturnPhysicalMaterial = true;
+
+				//Create trace object in world
+				bool TraceShot = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECollisionChannel::ECC_PhysicsBody, CollisionParams);
+				DrawDebugLine(
+					GetWorld(),
+					StartLocation,
+					EndLocation,
+					FColor(255,0,0),
+					false,
+					0.2,0,12.f);
+				if(HitResult.GetActor())
+				{
+					if(HitResult.PhysMaterial.IsValid())
+					{
+						EPhysicalSurface HittedSurfaceType = UGameplayStatics::GetSurfaceType(HitResult);
+						if(WeaponData.ProjectileData.HitDecalPerSurface.Contains(HittedSurfaceType))
+						{
+							UMaterialInterface* DecalMaterial = WeaponData.ProjectileData.HitDecalPerSurface[HittedSurfaceType];
+
+							if(DecalMaterial && HitResult.GetComponent())
+							{
+								UE_LOG(LogTemp, Warning, TEXT("DECAL"));
+								UGameplayStatics::SpawnDecalAttached(DecalMaterial,FVector(20.0f), HitResult.GetComponent(), NAME_None, HitResult.ImpactPoint, HitResult.Normal.Rotation(), EAttachLocation::KeepWorldPosition, 10.0f);
+							}
+						}
+						if(WeaponData.ProjectileData.HitParticlePerSurface.Contains(HittedSurfaceType))
+						{
+							UParticleSystem* ParticleSystem = WeaponData.ProjectileData.HitParticlePerSurface[HittedSurfaceType];
+							if(ParticleSystem)
+							{
+								UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ParticleSystem, FTransform(HitResult.ImpactNormal.Rotation(), HitResult.ImpactPoint,FVector(1.0f)));
+							}		
+						}
+						if(WeaponData.ProjectileData.HitSound)
+						{
+							UGameplayStatics::PlaySoundAtLocation(GetWorld(), WeaponData.ProjectileData.HitSound, HitResult.ImpactPoint);
+						}
+					}
+					
+					UGameplayStatics::ApplyDamage(HitResult.GetActor(), WeaponDamage, GetInstigatorController(), this, NULL);
+				}
+				if(TraceShot)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("AWeaponDefault::Fire() -- Shooted Actor: %s"), *FString(HitResult.GetActor()->GetName()));
+					UE_LOG(LogTemp, Warning, TEXT("AWeaponDefault::Fire() -- Missing ProjectileActorClass reference, using trace"));
+				}
+				
+				
 			}
 		}
 	}
@@ -290,14 +344,15 @@ void AWeaponDefault::Fire()
 		{
 			UStaticMeshComponent* BulletMeshComp = Cast<UStaticMeshComponent>(BulletCaseDrop->GetRootComponent());
 			// Applying physics impulse on the case to the right from character
-			FVector FwdVec = BulletCaseDrop->GetActorForwardVector();
+			FVector FwdVec = BulletCaseDrop->GetActorRightVector();
 			FVector ImpulseVector = FVector(0.0f, 1.0f, 0.0f);
 			float ImpulseStrength = 150.f;
-			BulletMeshComp->AddImpulse(ImpulseVector * ImpulseStrength * BulletMeshComp->GetMass());
+			BulletMeshComp->AddImpulse(FwdVec * ImpulseStrength * BulletMeshComp->GetMass());
 		}		
 	}
 	
 	CurrentDispersion+=CurrentDispersionRecoil; // -- Add recoil to dispersion
+	CurrentDispersionTimeout = WeaponData.DispersionWeaponData.DispersionTimeout;
 	//TODO: Sounds and effects
 	UGameplayStatics::SpawnSoundAtLocation(GetWorld(), WeaponData.SoundFireWeapon,GetActorLocation());
 	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), WeaponData.EffectFireWeapon, ShootLocation->GetComponentTransform());
@@ -364,7 +419,7 @@ void AWeaponDefault::InitReload()
 		SpawnParams.Owner = GetOwner();
 		SpawnParams.Instigator = GetInstigator();
 		FVector SpawnLocation = MagazineDropLocation->GetComponentLocation();
-		FRotator SpawnRotator = FRotator(0.0f);
+		FRotator SpawnRotator = GetActorRotation();
 		AActor* MagActor = Cast<AActor>(GetWorld()->SpawnActor(WeaponData.MagazineDrop, &SpawnLocation, &SpawnRotator, SpawnParams));
 	}
 	// Animation delegate call

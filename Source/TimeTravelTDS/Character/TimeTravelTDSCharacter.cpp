@@ -123,6 +123,7 @@ void ATimeTravelTDSCharacter::InputLookAxisY(float Value)
 
 void ATimeTravelTDSCharacter::InitWeapon(FName WeaponDataRowName)
 {
+	
 	UTDSGameInstance* myGI = Cast<UTDSGameInstance>(GetGameInstance());
 	FWeaponInfo newWeaponInfo;
 	if(myGI)
@@ -144,6 +145,8 @@ void ATimeTravelTDSCharacter::InitWeapon(FName WeaponDataRowName)
 				{
 					FAttachmentTransformRules Rule(EAttachmentRule::SnapToTarget, false);
 					newWeapon->AttachToComponent(GetMesh(), Rule, FName("WeaponRightHand"));
+					if(CurrentWeapon)
+						CurrentWeapon->Destroy();
 					CurrentWeapon = newWeapon;
 
 					newWeapon->WeaponInit(newWeaponInfo);

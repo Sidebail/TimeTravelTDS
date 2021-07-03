@@ -119,6 +119,7 @@ public:
 	float ReloadTime = 0.0f;
 	float DispersionTime = 0.3f;
 	float DispersionReductionStepTime = 0.3f;
+	float CurrentDispersionTimeout = 0;
 	void InitReload();
 	void FinishReload();
 

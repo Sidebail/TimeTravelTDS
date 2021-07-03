@@ -58,6 +58,33 @@ struct FWeaponDispersion
 		float Idle_DispersionRecoil = .4f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dispersion")
 		float Idle_DispersionReduction = 0.3f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dispersion")
+		float DispersionTimeout = 2.f;
+};
+
+USTRUCT(BlueprintType)
+struct FExplosionInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Damage")
+	float MaxDamage = 20.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Damage")
+	float MinDamage = 5.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Radius")
+	float InnerRadius = 100.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Radius")
+	float OuterRadius = 250.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Damage")
+	float DamageFalloff = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Physics")
+	float ImpulseForce = 1000.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Physics")
+	bool bIgnoreOwningActor = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Explosion Physics")
+	bool ImpulseVelChange = false;
+	
+	
 };
 
 USTRUCT(BlueprintType)
@@ -68,9 +95,13 @@ struct FProjectileInfo
 	// General settings that projectile needs
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData")
 	TSubclassOf<class AProjectileDefault> ProjectileClass = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="ProjectileData")
+	UStaticMesh* ProjectileMesh = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="ProjectileData")
+	UParticleSystem* TrailFX = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData")
 	float ProjectileDamage = 20.0f;
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData")
 	float ProjectileLifeTime = 20.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData")
@@ -89,7 +120,12 @@ struct FProjectileInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData")
 	TMap<TEnumAsByte<EPhysicalSurface>, UParticleSystem*> HitParticlePerSurface;
 
+	// If Projectile is explosive
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData Explosion")
+	bool isExplosive = false;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ProjectileData Explosion")
+	FExplosionInfo ExplosionData;
 };
 
 USTRUCT(BlueprintType)
@@ -114,9 +150,10 @@ struct FWeaponInfo : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dispersion")
 	FWeaponDispersion DispersionWeaponData;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Projectile")
 	FProjectileInfo ProjectileData;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Projectile")
+	float TraceRange;
 
 	// Sounds of weapon. Sound of projectile hits will be in Projectile
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
@@ -141,6 +178,8 @@ struct FWeaponInfo : public FTableRowBase
 	float ProjectileMaxSpeed = 1200.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Damage and Projectile")
 	float ProjectileGravityScale = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Damage and Projectile")
+	bool bIsMouseFollowed = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Trace")
 	float DistanceTrace = 2000.0f;
